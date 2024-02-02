@@ -1,4 +1,6 @@
-# default
+# Laughing man web
+
+https://101ta28.github.io/laughing-man-web/
 
 ## Project setup
 
