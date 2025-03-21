@@ -1,5 +1,5 @@
 <template>
-  <v-container>
+  <v-container fluid class="fullscreen-container pa-0 ma-0">
     <div v-if="!hasUserMedia" class="text-center">
       <v-alert type="error">
         お使いのブラウザでは getUserMedia() がサポートされていません。
@@ -10,31 +10,35 @@
         カメラを有効にする
       </v-btn>
       <div v-show="cameraEnabled" style="position: relative;">
-        <video id="webcam" style="width: 100%; max-width: 640px; height: auto;" autoplay playsinline></video>
+        <video id="webcam" style="width: 100vw; height: 100vh; object-fit: cover;" autoplay playsinline></video>
         <div id="liveView" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;">
           <!-- バウンディングボックスをここに表示 -->
-          <div v-for="(prediction, index) in predictions" :key="index" class="highlighter" :style="getStyle(prediction)">
+          <div v-for="(prediction, index) in predictions" :key="index" class="highlighter"
+            :style="getStyle(prediction)">
           </div>
         </div>
       </div>
-      <v-btn color="success" @click="saveImage" v-if="cameraEnabled">
-        Save Image
-      </v-btn>
     </div>
   </v-container>
   <v-footer app>
     <v-spacer />
-    <span>X:
+    <v-btn color="success" @click="saveImage" v-if="cameraEnabled" class="ma-2">
+      Save Image
+    </v-btn>
+    <span class="mr-4">
+      X:
       <a href="https://twitter.com/101ta28" target="_blank" rel="noopener noreferrer">
         @101ta28
       </a>
     </span>
   </v-footer>
+
 </template>
 
 <script setup>
 import { FaceDetector, FilesetResolver } from '@mediapipe/tasks-vision';
 import { onMounted, reactive, ref } from 'vue';
+import html2canvas from 'html2canvas';
 
 const cameraEnabled = ref(false);
 const hasUserMedia = ref(!!navigator.mediaDevices?.getUserMedia);
@@ -126,44 +130,26 @@ function getStyle(prediction) {
 }
 
 async function saveImage() {
-  const videoElement = document.getElementById('webcam');
-  const canvas = document.createElement('canvas');
-  canvas.width = videoElement.videoWidth;
-  canvas.height = videoElement.videoHeight;
-  const ctx = canvas.getContext('2d');
+  const targetElement = document.querySelector('#webcam')?.parentElement;
+  if (!targetElement) {
+    console.error("スクリーンショット対象の要素が見つかりません。");
+    return;
+  }
 
-  // ビデオの現在のフレームをキャンバスに描画
-  ctx.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
-
-  // 各バウンディングボックスに対応する画像を非同期にロード
-  const imageLoadPromises = predictions.map(prediction => {
-    return new Promise(resolve => {
-      const scaleX = canvas.width / videoElement.offsetWidth;
-      const scaleY = canvas.height / videoElement.offsetHeight;
-      const padding = 150;
-      const additionalTopOffset = 20;
-      const left = (prediction.boundingBox.originX - padding / 2) * scaleX;
-      const top = (prediction.boundingBox.originY - padding / 2 - additionalTopOffset) * scaleY;
-      const width = (prediction.boundingBox.width + padding) * scaleX;
-      const height = (prediction.boundingBox.height + padding) * scaleY;
-
-      const img = new Image();
-      img.src = coverImageUrl;
-      img.onload = () => {
-        ctx.drawImage(img, left, top, width, height);
-        resolve();
-      };
+  try {
+    const canvas = await html2canvas(targetElement, {
+      useCORS: true,
+      backgroundColor: null, // 必要に応じて透明 or 黒背景に
     });
-  });
 
-  // すべての画像のロードが完了したら、キャンバスの内容を保存
-  await Promise.all(imageLoadPromises).then(() => {
     const imageURL = canvas.toDataURL('image/png');
     const link = document.createElement('a');
     link.href = imageURL;
-    link.download = 'captured-image.png';
+    link.download = 'screenshot.png';
     link.click();
-  });
+  } catch (error) {
+    console.error("スクリーンショットの取得に失敗:", error);
+  }
 }
 
 
@@ -177,4 +163,27 @@ onMounted(() => {
 .highlighter {
   box-sizing: border-box;
 }
+
+.fullscreen-container {
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  position: relative;
+  background-color: black;
+}
+
+#liveView {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  pointer-events: none;
+  z-index: 1;
+}
+
+#webcam {
+  z-index: 0;
+}
+
 </style>
