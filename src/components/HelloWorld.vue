@@ -37,7 +37,7 @@
 
 <script setup>
 import { FaceDetector, FilesetResolver } from '@mediapipe/tasks-vision';
-import { onMounted, reactive, ref } from 'vue';
+import { onMounted, onBeforeUnmount, reactive, ref } from 'vue';
 import html2canvas from 'html2canvas';
 
 const cameraEnabled = ref(false);
@@ -45,6 +45,7 @@ const hasUserMedia = ref(!!navigator.mediaDevices?.getUserMedia);
 const predictions = reactive([]);
 
 let faceDetector;
+let mediaStream = null;
 
 async function initializeFaceDetector() {
   const vision = await FilesetResolver.forVisionTasks('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm');
@@ -63,14 +64,22 @@ async function enableCam() {
     return;
   }
   try {
-    const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+    mediaStream = await navigator.mediaDevices.getUserMedia({ video: true });
     const videoElement = document.querySelector('#webcam');
-    videoElement.srcObject = stream;
+    videoElement.srcObject = mediaStream;
     cameraEnabled.value = true;
     predictWebcam();
   } catch (err) {
     console.error(err);
     alert("Webcam cannot be accessed.");
+  }
+}
+
+function stopCamera() {
+  if (mediaStream) {
+    mediaStream.getTracks().forEach(track => track.stop());
+    mediaStream = null;
+    cameraEnabled.value = false;
   }
 }
 
@@ -152,10 +161,16 @@ async function saveImage() {
   }
 }
 
-
+onBeforeUnmount(() => {
+  stopCamera();
+});
 
 onMounted(() => {
   initializeFaceDetector();
+});
+
+window.addEventListener('beforeunload', () => {
+  stopCamera();
 });
 </script>
 
@@ -185,5 +200,4 @@ onMounted(() => {
 #webcam {
   z-index: 0;
 }
-
 </style>
